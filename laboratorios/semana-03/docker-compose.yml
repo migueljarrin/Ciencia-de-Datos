@@ -1,7 +1,7 @@
 
 
 name: data-ml-infra
-services:
+services: 
 
   kestra-db:
     image: postgres:17-alpine
