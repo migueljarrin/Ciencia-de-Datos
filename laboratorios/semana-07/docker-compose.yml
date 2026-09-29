@@ -1,0 +1,113 @@
+name: lab07-nyc-taxi
+
+# Tubería ELT NYC Yellow Taxi
+#   Kestra (orquestador) -> ingest.py (E+L a Snowflake RAW) -> dbt (T: bronze/silver/gold)
+#
+#   docker compose up -d --build             # levanta Kestra en http://localhost:8080
+#   docker compose run --rm pipeline         # ejecuta la tubería completa por CLI (sin UI)
+
+x-snowflake-env: &snowflake-env
+  SNOWFLAKE_ACCOUNT: ${SNOWFLAKE_ACCOUNT}
+  SNOWFLAKE_USER: ${SNOWFLAKE_USER}
+  SNOWFLAKE_ROLE: ${SNOWFLAKE_ROLE}
+  SNOWFLAKE_WAREHOUSE: ${SNOWFLAKE_WAREHOUSE}
+  SNOWFLAKE_DATABASE: ${SNOWFLAKE_DATABASE}
+  SNOWFLAKE_PRIVATE_KEY_PATH: /lab/keys/rsa_key.p8
+  START_MONTH: ${START_MONTH}
+  END_MONTH: ${END_MONTH}
+  DATA_DIR: /lab/data
+  DBT_PROFILES_DIR: /lab/dbt
+  DBT_PROJECT_DIR: /lab/dbt
+
+x-lab-volumes: &lab-volumes
+  - ./ingest:/lab/ingest
+  - ./dbt:/lab/dbt
+  - ./keys:/lab/keys:ro
+  - ./scripts:/lab/scripts
+  - taxi-data:/lab/data
+
+services:
+
+  # Base interna de Kestra (metadatos de flows y ejecuciones)
+  kestra-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${KESTRA_DB_USER}
+      POSTGRES_PASSWORD: ${KESTRA_DB_PASSWORD}
+      POSTGRES_DB: kestra
+    volumes:
+      - kestra-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KESTRA_DB_USER} -d kestra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kestra:
+    build: .
+    image: lab07-kestra-pipeline:latest
+    user: "root"
+    command: ["server", "standalone"]
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *snowflake-env
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://kestra-db:5432/kestra
+            driver-class-name: org.postgresql.Driver
+            username: ${KESTRA_DB_USER}
+            password: ${KESTRA_DB_PASSWORD}
+        kestra:
+          tutorial-flows:
+            enabled: false
+          server:
+            basic-auth:
+              enabled: false
+          repository:
+            type: postgres
+          queue:
+            type: postgres
+          storage:
+            type: local
+            local:
+              base-path: /app/storage
+          tasks:
+            tmp-dir:
+              path: /tmp/kestra-wd/tmp
+        url: http://localhost:8080
+        # Sincroniza kestra/flows/ con Kestra (se recarga al editar el YAML)
+        micronaut:
+          io:
+            watch:
+              enabled: true
+              paths:
+                - /app/flows
+    volumes:
+      - ./ingest:/lab/ingest
+      - ./dbt:/lab/dbt
+      - ./keys:/lab/keys:ro
+      - ./scripts:/lab/scripts
+      - taxi-data:/lab/data
+      - kestra-storage:/app/storage
+      - ./kestra/flows:/app/flows
+    depends_on:
+      kestra-db:
+        condition: service_healthy
+
+  # Misma imagen, para ejecutar la tubería completa sin la UI de Kestra
+  pipeline:
+    image: lab07-kestra-pipeline:latest
+    build: .
+    user: "root"
+    entrypoint: ["bash", "/lab/scripts/run_pipeline.sh"]
+    environment:
+      <<: *snowflake-env
+    volumes: *lab-volumes
+    profiles: ["cli"]
+
+volumes:
+  kestra-db-data:
+  kestra-storage:
+  taxi-data:

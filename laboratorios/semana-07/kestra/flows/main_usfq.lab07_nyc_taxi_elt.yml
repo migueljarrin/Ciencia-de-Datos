@@ -1,0 +1,56 @@
+id: nyc_taxi_elt
+namespace: usfq.lab07
+description: |
+  Laboratorio Integrador I - Tubería ELT de NYC Yellow Taxi.
+  1) Ingesta: descarga los parquet mensuales de la TLC y los carga en Snowflake (RAW).
+  2) dbt: seeds + modelos bronze -> silver -> gold + pruebas de calidad.
+  Idempotente: puede re-ejecutarse sin duplicar datos.
+
+inputs:
+  - id: start_month
+    type: STRING
+    defaults: "2025-01"
+    description: Primer mes a procesar (YYYY-MM)
+  - id: end_month
+    type: STRING
+    defaults: "2026-08"
+    description: Último mes a procesar (YYYY-MM)
+  - id: force_reload
+    type: BOOL
+    defaults: false
+    description: Recargar meses aunque su versión en la TLC no haya cambiado
+
+tasks:
+  - id: ingest
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    timeout: PT2H
+    commands:
+      - >-
+        $PIPELINE_PY /lab/ingest/ingest.py
+        --start {{ inputs.start_month }} --end {{ inputs.end_month }}
+        {{ inputs.force_reload ? '--force' : '' }}
+
+  - id: dbt_deps
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - cd /lab/dbt && $DBT_BIN deps
+
+  - id: dbt_build
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    timeout: PT1H
+    commands:
+      - cd /lab/dbt && $DBT_BIN build --fail-fast
+
+triggers:
+  # La TLC publica los datos con ~2 meses de retraso; se revisa cada mes.
+  # Los meses ya cargados (mismo ETag) se omiten, así que la corrida es barata.
+  - id: monthly
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 6 5 * *"
+    disabled: true

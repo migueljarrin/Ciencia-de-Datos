@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: brz_yellow_tripdata
+    description: >
+      Capa bronze. Un registro por fila de los parquet de la TLC, sin transformar,
+      con metadata de linaje (_source_file, _source_period, _loaded_at, _ingestion_id).
+    columns:
+      - name: _source_file
+        description: "Nombre del archivo parquet de origen (p. ej. yellow_tripdata_2025-01.parquet)."
+        data_tests: [not_null]
+      - name: _source_period
+        description: "Mes al que corresponde el archivo (primer día del mes)."
+        data_tests: [not_null]
+      - name: _loaded_at
+        description: "Fecha y hora en que la fila se cargó a Snowflake."
+        data_tests: [not_null]
+      - name: _ingestion_id
+        description: "Identificador de la ejecución de ingesta."

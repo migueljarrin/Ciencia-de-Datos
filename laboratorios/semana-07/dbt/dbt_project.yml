@@ -1,0 +1,48 @@
+name: nyc_taxi
+version: "1.0.0"
+config-version: 2
+profile: nyc_taxi
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Rango de la dimensión fecha (cubre 2025-01..2026-12 con holgura)
+  dim_date_start: "2024-12-01"
+  dim_date_end: "2027-12-31"
+  # Reglas de validez usadas en silver (justificadas en README.md)
+  max_trip_hours: 24
+  max_trip_distance_miles: 500
+  max_total_amount: 1000
+  max_passengers: 6
+
+models:
+  nyc_taxi:
+    bronze:
+      +schema: bronze
+      +materialized: view
+    silver:
+      +schema: silver
+      +materialized: incremental
+    gold:
+      +schema: gold
+      +materialized: table
+
+seeds:
+  nyc_taxi:
+    +schema: reference
+    taxi_zone_lookup:
+      +column_types:
+        LocationID: integer
+        Borough: varchar
+        Zone: varchar
+        service_zone: varchar
+    vendors:
+      +column_types: {vendor_id: integer, vendor_name: varchar}
+    payment_types:
+      +column_types: {payment_type_id: integer, payment_type_name: varchar}
+    rate_codes:
+      +column_types: {rate_code_id: integer, rate_code_name: varchar}

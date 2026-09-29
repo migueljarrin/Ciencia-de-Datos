@@ -1,0 +1,120 @@
+version: 2
+
+models:
+  - name: fct_trips
+    description: >
+      Tabla de hechos de viajes. Grano: un viaje de taxi amarillo válido
+      (una fila por trip_key). Métricas aditivas: pasajeros, distancia, duración
+      y todos los componentes de la tarifa.
+    columns:
+      - name: trip_key
+        description: "PK del hecho."
+        data_tests: [unique, not_null]
+      - name: pickup_date_key
+        description: "FK a dim_date (fecha de recogida)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
+      - name: dropoff_date_key
+        description: "FK a dim_date (fecha de llegada)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_key}
+      - name: pickup_hour_key
+        description: "FK a dim_time (hora de recogida)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_time'), field: hour_key}
+      - name: pickup_location_id
+        description: "FK a dim_location (zona de origen)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_location'), field: location_id}
+      - name: dropoff_location_id
+        description: "FK a dim_location (zona de destino)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_location'), field: location_id}
+      - name: vendor_id
+        description: "FK a dim_vendor."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_vendor'), field: vendor_id}
+      - name: payment_type_id
+        description: "FK a dim_payment_type."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_payment_type'), field: payment_type_id}
+      - name: rate_code_id
+        description: "FK a dim_rate_code."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_rate_code'), field: rate_code_id}
+      - name: trip_distance_miles
+        data_tests: [not_null]
+      - name: trip_duration_minutes
+        data_tests: [not_null]
+      - name: total_amount
+        data_tests: [not_null]
+
+  - name: dim_date
+    description: "Calendario. Grano: un día."
+    columns:
+      - name: date_key
+        description: "PK (YYYYMMDD)."
+        data_tests: [unique, not_null]
+      - name: full_date
+        data_tests: [unique, not_null]
+
+  - name: dim_time
+    description: "Hora del día. Grano: una hora (0-23)."
+    columns:
+      - name: hour_key
+        description: "PK."
+        data_tests: [unique, not_null]
+
+  - name: dim_location
+    description: "Zonas de taxi de la TLC (265). Se usa como origen y destino."
+    columns:
+      - name: location_id
+        description: "PK (LocationID de la TLC)."
+        data_tests: [unique, not_null]
+      - name: borough
+        data_tests: [not_null]
+      - name: zone_name
+        data_tests: [not_null]
+
+  - name: dim_vendor
+    description: "Proveedor del sistema TPEP que reportó el viaje."
+    columns:
+      - name: vendor_id
+        description: "PK (-1 = desconocido)."
+        data_tests: [unique, not_null]
+      - name: vendor_name
+        data_tests: [not_null]
+
+  - name: dim_payment_type
+    description: "Forma de pago."
+    columns:
+      - name: payment_type_id
+        description: "PK."
+        data_tests: [unique, not_null]
+      - name: payment_type_name
+        data_tests: [not_null]
+
+  - name: dim_rate_code
+    description: "Código de tarifa vigente al final del viaje."
+    columns:
+      - name: rate_code_id
+        description: "PK (99 = desconocido)."
+        data_tests: [unique, not_null]
+      - name: rate_code_name
+        data_tests: [not_null]
