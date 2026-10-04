@@ -1,0 +1,11 @@
+# Credenciales: NUNCA al repositorio
+.env
+keys/
+
+# Artefactos locales
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
+__pycache__/
+kestra/flows/main_tutorial_*.yml
